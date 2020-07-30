@@ -1,0 +1,84 @@
+package com.stpl.controller;
+import java.util.Collections;
+import java.util.Map;
+
+
+import com.skillrock.rest.requestBean.Response;
+
+import org.hibernate.SessionFactory;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.skillrock.config.KafkaConsumerConfig;
+import com.skillrock.database.entity.StCashUserInfo;
+
+
+
+@RestController
+@RequestMapping(path = "/api/comm")
+public class KafkaConsumerRestController {
+	
+
+	
+	@Autowired
+	SessionFactory factory;
+	
+	@Autowired
+	private KafkaTemplate<String, StCashUserInfo> kafkaTemplate;
+	
+	@Autowired
+    private KafkaConsumerConfig kafkaConsumerConfig;
+
+	@PostMapping("/cashier/response")
+	public Response sendMessage(@RequestParam("message") String message , @RequestBody StCashUserInfo cashUserInfo) {
+		Response response = new Response();
+		kafkaTemplate.send(message, cashUserInfo);
+		kafkaConsumerConfig.consumerFatory();
+		return response;
+	}
+	
+	@RequestMapping(value = "/consume-cashier/{topic}", method = { RequestMethod.GET })
+	public String consumeMessage(@PathVariable String topic) {
+		
+		ConsumerFactory<String, Object> consumerFactory = getConsumerFactoryInstance();
+
+		Consumer<String, Object> consumer = consumerFactory.createConsumer();
+		
+		consumer.subscribe(Collections.singletonList("topic"));
+		
+		ConsumerRecords<String, Object> consumerRecords = consumer.poll(123232l);
+
+		consumerRecords.forEach(action -> {
+			System.out.println(action.value());
+		});
+		
+		return  "success";
+	}
+	
+	
+	public ConsumerFactory<String, Object> getConsumerFactoryInstance() {
+		Map<String, Object> configs = new java.util.HashMap<>();
+		configs.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "172.31.48.12:9092");
+		configs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+		configs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+		configs.put(ConsumerConfig.GROUP_ID_CONFIG, "anyIdForGroup");
+		configs.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 15000);
+		configs.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 1000);
+		ConsumerFactory<String, Object> consumerFactory = new DefaultKafkaConsumerFactory<>(configs);
+		return consumerFactory;
+	}
+}

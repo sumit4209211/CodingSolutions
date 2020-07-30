@@ -1,0 +1,63 @@
+ackage com.skillrock.pms.exception;
+
+public class CommException extends Exception {
+
+    private static final long serialVersionUID = 1L;
+    private int errorCode;
+    private String errorMessage;
+    private String userMessage;
+
+    public CommException() {
+    }
+
+    public CommException(int errorCode, String errorMessage) {
+        super(errorMessage);
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+    }
+
+    public CommException(Throwable cause, int errorCode, String errorMessage) {
+        super(errorMessage,cause);
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+
+    }
+
+    public CommException(int errorCode, String errorMessage, String userMessage) {
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.userMessage = userMessage;
+    }
+
+    public CommException(Throwable cause, int errorCode, String errorMessage, String userMessage) {
+        super(cause);
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.userMessage = userMessage;
+    }
+
+    public int getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(int errorCode) {
+        this.errorCode = errorCode;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public String getUserMessage() {
+        return userMessage;
+    }
+
+    public void setUserMessage(String userMessage) {
+        this.userMessage = userMessage;
+    }
+}
+

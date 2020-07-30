@@ -1,0 +1,47 @@
+package com.stpl.controller;
+
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.hibernate.SessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.skillrock.database.entity.StCashUserInfo;
+import com.skillrock.repository.UserRepositoryImpl;
+
+@SuppressWarnings({"unchecked","rawtypes"})
+public class CommunicationProcessController {
+	
+	@Autowired
+	SessionFactory factory;
+	@Autowired
+	UserRepositoryImpl userRepository;
+
+    private CommunicationProcessController(){}
+    
+     private static class Instance{
+        private static final ExecutorService BATCH_EXECUTOR=Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    }
+
+    private static class SingleTon {
+        private final static CommunicationProcessController INSTANCE = new CommunicationProcessController();
+    }
+
+    public static CommunicationProcessController getInstance(){
+        return SingleTon.INSTANCE;
+    }
+
+    public Future<Object> sendMessage(List<StCashUserInfo> cashUserInfoBeans) throws Exception{
+        Future<Object> future = null;
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        for(StCashUserInfo commonCommBean : cashUserInfoBeans) {
+           
+        }
+        executor.shutdown();
+
+        return future;
+    }
+}
