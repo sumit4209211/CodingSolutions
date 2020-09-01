@@ -1,0 +1,24 @@
+command & : This makes the command run as background
+nohup : No hangup command
+
+sudo:- super user do 
+apt : advanced packaging tool
+
+dpkg: debain package installer
+apt: advanced packaging tool
+ppa: Personal pacakge archieves
+
+ppa: Personal package archienves
+
+ppa : personal package archieves
+ppa: personal package archieves
+ppa: personal package archieves
+
+apt: advanced packaging tool
+apt advanced packaging tool
+apt: advanced packaging tool
+apt: advanced packaging tool
+apt : advanced packaging tool
+
+
+

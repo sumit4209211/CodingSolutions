@@ -1,0 +1,238 @@
+package com.stpl.controller;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.hibernate.Session;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.stpl.dao.CommonDaoImpl;
+import com.stpl.database.entity.StGenSmsEmailProviderMaster;
+import com.stpl.datamodel.CommonCommBean;
+import com.stpl.exceptions.CommException;
+import com.stpl.weaver.WeaverIntegration;
+
+public class SendSMS extends Thread {
+	@Autowired
+	CommunicationProcessController communicationProcessController;
+	
+	@Autowired
+	WeaverIntegration weaverIntegration;
+	@Autowired
+	CommonDaoImpl commonDao;
+	
+
+	private String  mobileNo;
+	private String msg;
+	private List<LinkedHashMap<String,String>> smsContentList;
+	private Map<String,String> varMap;
+	private String provider;
+	private String smsType;
+	private short domainId;
+	private short aliasId;
+	private CommonCommBean commBean;
+	private boolean isCommChannel;
+	
+	private static final Logger logger = LogManager.getLogger(SendSMS.class);
+
+
+    public SendSMS(){
+		
+	}
+	
+	public SendSMS(short aliasId,String mobileNo,String msg, String provider) {
+		this.msg = msg;
+		this.mobileNo = mobileNo;
+		this.aliasId=aliasId;
+		this.provider = provider;
+	}
+	
+	public SendSMS(List<LinkedHashMap<String,String>> smsContentList, String provider, String smsType, short domainId, short aliasId){
+		this.smsContentList = smsContentList;
+		this.provider = provider;
+		this.smsType = smsType;
+		this.domainId = domainId;
+		this.aliasId = aliasId;
+		
+	}
+	
+	public SendSMS(Map<String,String> varMap, String provider, String smsType, short domainId, short aliasId){
+		this.varMap = varMap;
+		this.provider = provider;
+		this.smsType = smsType;
+		this.domainId = domainId;
+		this.aliasId = aliasId;
+	}
+	
+	public void run(){
+		if(isCommChannel) {
+				sendMsg(varMap,commBean);
+			
+		} 
+		
+	}
+	
+
+	public   boolean sendMsg(Map<String,String> varMap, CommonCommBean commonCommBean) {
+		return sendMsg(varMap, null, null, null, commonCommBean, null);
+	}
+	
+	public   boolean sendMsg(Map<String,String> varMap,String smsType, short domainId, short aliasId,Session session){
+		return sendMsg(varMap, smsType, domainId, aliasId, null, session);
+	}
+	
+	public   boolean sendMsg(Map<String,String> varMap,String smsType, Short domainId, Short aliasId, CommonCommBean commonCommBean, Session session) {
+		if (commonCommBean==null && "Y".equals(weaverIntegration.fetchSystemProperties("SYSTEM_SEND_SMS",session))) {
+			StGenSmsEmailProviderMaster providerInfo=commonDao.fetchSmsEmailProvider(aliasId,"SMS", session);
+			List<String> dynamicSenderProviders = Arrays.asList("unicel","AWS_SNS","MTN");
+			SendSMS commDao = new SendSMS(varMap, providerInfo != null?(dynamicSenderProviders.contains(providerInfo.getProviderName())?providerInfo.getProviderName()+"#"+providerInfo.getProviderKey():providerInfo.getProviderName()):"", smsType, domainId, aliasId);
+			commDao.setDaemon(false);
+			commDao.start();
+			return true;
+		} else if(commonCommBean != null ){
+			try {
+				communicationProcessController.sendMessageProcess(commonCommBean, varMap, session);
+			} catch (CommException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return true;
+		} else {
+			logger.info("---SYSTEM_SEND_SMS and COMM_SMS ---- set to N ");
+			return false;
+		}
+	}
+	
+
+	
+		
+	public String replaceMobVarWithValue(String msg,Map<String, String> smsVerMap) throws IOException{
+//		if(smsVerMap.get("InvitionLink")!=null)
+//			msg = msg.replace("{InvitionLink , fallback=}", smsVerMap.get("InvitionLink"));
+//		if(smsVerMap.get("Email")!=null)
+//			msg = msg.replace("{Email,fallback=}", smsVerMap.get("Email"));
+//		if(smsVerMap.get("LastName")!=null)
+//			msg = msg.replace("{LastName, fallback=}", smsVerMap.get("LastName"));
+//		if(smsVerMap.get("MobileNo")!=null)
+//			msg = msg.replace("{MobileNo, fallback=}", smsVerMap.get("MobileNo"));
+//		if(smsVerMap.get("FirstName")!=null)	
+//			msg = msg.replace("{FirstName,fallback=}", smsVerMap.get("FirstName"));
+//		if(smsVerMap.get("UserName")!=null)
+//			msg = msg.replace("{UserName, fallback=}", smsVerMap.get("UserName"));
+//		if(smsVerMap.get("Name")!=null)	
+//			msg = msg.replace("{Name,fallback=}", smsVerMap.get("Name"));
+//		if(smsVerMap.get("ReferenceNo")!=null)	
+//			msg = msg.replace("{ReferenceNo, fallback=}", smsVerMap.get("ReferenceNo"));
+//		if(smsVerMap.get("SecureKey")!=null)	
+//			msg = msg.replace("{SecureKey, fallback=}", smsVerMap.get("SecureKey"));
+//		if(smsVerMap.get("Amount")!=null)	
+//			msg = msg.replace("{amount, fallback=}", smsVerMap.get("Amount"));
+//		if(smsVerMap.get("Date")!=null)	
+//			msg = msg.replace("{Date, fallback=}", smsVerMap.get("Date"));
+//		if(smsVerMap.get("ReferenceTxnNo")!=null)	
+//			msg = msg.replace("{RefTxnNo, fallback=}", smsVerMap.get("ReferenceTxnNo"));
+//		if(smsVerMap.get("DomainName")!=null)	
+//			msg = msg.replace("{DomainName, fallback=}", smsVerMap.get("DomainName"));
+		
+		for(String key: smsVerMap.keySet()){
+			if(smsVerMap.get(key)!=null)
+				msg = msg.replace("{"+key.trim()+", fallback=}", smsVerMap.get(key));
+		}
+		return msg;
+	}
+	public static void main(String[] arg){
+		/*sendSMS((short)1,"7891615021","Testing unicel sms service","unicel");
+		*/
+		String deliveryMessage = "Message Sent Successfully";
+		if(deliveryMessage.toLowerCase().contains("success")){
+			System.out.println("soem");
+
+		}
+
+	}
+	
+	public String getMobileNo() {
+		return mobileNo;
+	}
+
+	public void setMobileNo(String mobileNo) {
+		this.mobileNo = mobileNo;
+	}
+
+	public String getMsg() {
+		return msg;
+	}
+
+	public void setMsg(String msg) {
+		this.msg = msg;
+	}
+
+	public List<LinkedHashMap<String, String>> getSmsContentList() {
+		return smsContentList;
+	}
+
+	public String getProvider() {
+		return provider;
+	}
+
+	public void setSmsContentList(List<LinkedHashMap<String, String>> smsContentList) {
+		this.smsContentList = smsContentList;
+	}
+
+	public void setProvider(String provider) {
+		this.provider = provider;
+	}
+
+	public String getSmsType() {
+		return smsType;
+	}
+
+	public void setSmsType(String smsType) {
+		this.smsType = smsType;
+	}
+
+	public short getDomainId() {
+		return domainId;
+	}
+
+	public void setDomainId(short domainId) {
+		this.domainId = domainId;
+	}
+
+	public short getAliasId() {
+		return aliasId;
+	}
+
+	public void setAliasId(short aliasId) {
+		this.aliasId = aliasId;
+	}
+
+	public Map<String,String> getVarMap() {
+		return varMap;
+	}
+
+	public void setVarMap(Map<String,String> varMap) {
+		this.varMap = varMap;
+	}
+
+	public CommonCommBean getCommBean() {
+		return commBean;
+	}
+
+	public void setCommBean(CommonCommBean commBean) {
+		this.commBean = commBean;
+	}
+
+	public boolean isCommChannel() {
+		return isCommChannel;
+	}
+
+	public void setCommChannel(boolean isCommChannel) {
+		this.isCommChannel = isCommChannel;
+	}
+}

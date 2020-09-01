@@ -1,0 +1,206 @@
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.ValidationException;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stpl.comm.common.repo.PermissionRepo;
+import com.stpl.comm.exception.COMMErrorException;
+import com.stpl.comm.exception.COMMException;
+import com.stpl.comm.exception.COMMMessages;
+import com.stpl.comm.exception.Interruptor;
+import com.stpl.comm.model.ErrorResponseVo;
+import com.stpl.comm.model.ServiceRespVO;
+import com.stpl.common.AppLogger;
+import com.stpl.common.Log8;
+
+@Aspect
+@Configuration
+public class LoggingHandler extends RequestValidation {
+
+	private ObjectMapper mapper = new ObjectMapper();
+	private Map<String, Map<String, Object>> mapOfRequest = new HashMap<>();
+
+	public Map<String, Map<String, Object>> getMapOfRequest() {
+		return mapOfRequest;
+	}
+
+	@Autowired
+	HttpServletRequest request;
+
+	@Autowired
+	PermissionRepo permissionRepo;
+
+	@Autowired
+	HttpServletResponse response;
+
+	@Before("execution(* com.stpl.comm.*.controller.*.*(..)) ")
+	public void before(JoinPoint joinPoint) {
+		validateRequestPermission(request, joinPoint, response, permissionRepo);
+	}
+
+	@After("execution(* com.stpl.comm.*.controller.*.*(..)) ")
+	public void after(JoinPoint joinPoint) {
+		if (mapOfRequest.containsKey(Thread.currentThread().getId() + "")) {
+			Object argObjValue = null;
+			if (joinPoint.getArgs() != null && joinPoint.getArgs().length > 0) {
+				argObjValue = joinPoint.getArgs()[0];
+			}
+			Map<String, Object> userRequest = new HashMap<>();
+			try {
+				if (argObjValue != null) {
+
+					for (Field field : argObjValue.getClass().getFields()) {
+						field.setAccessible(true);
+						if (!field.getName().equals("response") && !field.getName().equals("request")) {
+							Object value = field.get(argObjValue);
+							userRequest.put(field.getName(), value == null ? "" : value.toString());
+						}
+					}
+
+					for (Field field : argObjValue.getClass().getDeclaredFields()) {
+						field.setAccessible(true);
+						if (!field.getName().equals("response") && !field.getName().equals("request")) {
+							Object value = field.get(argObjValue);
+							userRequest.put(field.getName(), value == null ? "" : value.toString());
+						}
+					}
+				}
+			} catch (IllegalAccessException e) {
+			}
+			Exception ex = (Exception) mapOfRequest.get(Thread.currentThread().getId() + "").get("exception");
+			JoinPoint jp = (JoinPoint) mapOfRequest.get(Thread.currentThread().getId() + "").get("jointPoint");
+			if (ex instanceof Interruptor) {
+			} else if (ex instanceof COMMException) {
+				if (jp.getSignature().getName().equals("authenticate")) {
+					System.out.println(jp.getTarget().getClass() + "| " + ex.getMessage());
+				} else {
+					AppLogger.writeLog("WARNING", "COMMException", "runtime", jp.getTarget().getClass().getName(),
+							jp.getSignature().getName(), "", "", "", "", userRequest, ex, "");
+				}
+			} else if (ex instanceof COMMErrorException) {
+				AppLogger.writeLog("ERROR", "COMMErrorException", "runtime", jp.getTarget().getClass().getName(),
+						jp.getSignature().getName(), "", "", "", "", userRequest, ex, "");
+			} else if (ex instanceof IllegalTransactionStateException) {
+				AppLogger.writeLog("ERROR", "IllegalTransactionStateException", "runtime",
+						jp.getTarget().getClass().getName(), jp.getSignature().getName(), "", "", "", "", userRequest,
+						ex, "");
+
+			} else if (ex instanceof DataAccessResourceFailureException) {
+			} else {
+				String className = jp.getTarget().getClass().getName();
+				Integer line = 0;
+				for (int i = 0; i < ex.getStackTrace().length; i++) {
+					if (ex.getStackTrace()[i].getClassName().contains("com.skilrock.rms")) {
+						line = ex.getStackTrace()[i].getLineNumber();
+						if (className.contains("proxy")) {
+							className = ex.getStackTrace()[i].getClassName();
+						}
+						break;
+					}
+				}
+				AppLogger.writeLog("ERROR", "FatalErrors", "runtime", className, jp.getSignature().getName(),
+						"line:" + line, "", "", "", userRequest, ex, "");
+			}
+			mapOfRequest.remove(Thread.currentThread().getId() + "");
+		}
+	}
+
+	@AfterThrowing(value = "execution(* com.stpl.comm.*.*.*.*(..)) && !execution(* com.stpl.comm.*.filters.*.*(..))", throwing = "ex")
+	public void afterThrowing(JoinPoint joinPoint, Exception ex) {
+		ex.printStackTrace();
+		boolean flag = false;
+		HttpServletResponse response = null;
+		ServiceRespVO serviceRespVO = new ServiceRespVO();
+		serviceRespVO.setResponseCode(COMMMessages.UNKNOWN_EXCEPTION_CODE);
+		serviceRespVO.setResponseMessage(COMMMessages.UNKNOWN_EXCEPTION_MESSAGE);
+		if (!(ex instanceof Interruptor || ex instanceof ValidationException)) {
+			Map<String, Object> mapOfException = new HashMap<>();
+			mapOfException.put("jointPoint", joinPoint);
+			mapOfException.put("exception", ex);
+			mapOfException.put("exceptionTime", new Date());
+			mapOfRequest.put(Thread.currentThread().getId() + "", mapOfException);
+		}
+		if (ex instanceof Interruptor) {
+		} else if (ex instanceof COMMException) {
+			COMMException rmsException = (COMMException) ex;
+			response = rmsException.getResponse();
+			serviceRespVO.setResponseCode(COMMMessages.SUCCESS_CODE);
+			serviceRespVO.setResponseMessage(COMMMessages.SUCCESS_MESSAGE);
+			serviceRespVO.setResponseData(new ErrorResponseVo(rmsException.getStatusCode(),
+					rmsException.getMessage().split("message:")[1].trim()));
+		} else if (ex instanceof COMMErrorException) {
+			COMMErrorException rmsErrorException = (COMMErrorException) ex;
+			response = rmsErrorException.getResponse();
+			serviceRespVO.setResponseCode(COMMMessages.SUCCESS_CODE);
+			serviceRespVO.setResponseMessage(COMMMessages.SUCCESS_MESSAGE);
+			serviceRespVO.setResponseData(new ErrorResponseVo(rmsErrorException.getStatusCode(),
+					rmsErrorException.getMessage().split("message:")[1]));
+		} else if (ex instanceof IllegalTransactionStateException) {
+			RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+			response = ((ServletRequestAttributes) requestAttributes).getResponse();
+			serviceRespVO.setResponseData(new ErrorResponseVo(
+					COMMMessages.TRANSACTION_FAILED_ERROR_CODE,
+					COMMMessages.TRANSACTION_FAILED_ERROR_MESSAGE + ex.getMessage()));
+		} else if (ex instanceof DataAccessResourceFailureException) {
+		} else {
+			RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+			response = ((ServletRequestAttributes) requestAttributes).getResponse();
+			serviceRespVO.setResponseData(new ErrorResponseVo(ex.hashCode(), ex.getMessage()));
+		}
+		try {
+			if (request != null && request.getRequestURL() != null) {
+				String url = request.getRequestURL().toString();
+				if (url.contains("ticketFeed")) {
+					flag = true;
+				}
+			}
+		} catch (Exception e) {
+		}
+
+		if (!flag && !(ex instanceof Interruptor)) {
+			if (response != null) {
+				response.setStatus(HttpStatus.OK.value());
+				response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+				try {
+					mapper.writeValue(response.getOutputStream(), serviceRespVO);
+				} catch (JsonGenerationException | JsonMappingException e) {
+					Log8.exceptionFatal(this.getClass(), e.getMessage(), this.getClass().getEnclosingMethod().getName(),
+							e);
+				} catch (IOException e) { // Ignore this due to we need to know which particular exception is generated
+					Log8.exceptionFatal(this.getClass(), e.getMessage(), this.getClass().getEnclosingMethod().getName(),
+							e);
+				}
+			}
+
+		}
+		try {
+			throw ex;
+		} catch (Exception e) {
+			throw new Interruptor(COMMMessages.SUCCESS_CODE, COMMMessages.SUCCESS_MESSAGE);
+		}
+	}
+}

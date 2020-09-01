@@ -1,0 +1,1 @@
+Only lazy loading in ANgular should required components acquire the space in DOM, not all teh components

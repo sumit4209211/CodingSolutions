@@ -1,0 +1,82 @@
+AWS Data Sync
+With data  sync pay only for the amount of data copied
+We can schedule your migration to run during off-hours, or limit the amount of network bandwidth that DataSync uses by configuring the built-in bandwidth throttle. DataSync preserves metadata between storage systems that have similar metadata structures, enabling a smooth transition of end users and applications to using your target AWS Storage service.
+
+1. Deploy an agent - Deploy a DataSync agent and associate it to your AWS account via the Management Console or API. The agent will be used to access your NFS server, SMB file share, or self-managed object storage to read data from it or write data to it.
+
+2. Create a data transfer task - Create a task by specifying the location of your data source and destination, and any options you want to use to configure the transfer, such as the desired task schedule.
+
+
+3. Start the transfer - Start the task and monitor data movement in the console or with Amazon CloudWatch.
+
+create an Amazon EC2 instance using a DataSync agent AMI.
+
+Remove-EC2VpcEndpoint (AWS Tools for Windows PowerShell)
+
+DataSync will calculate and compare full-file checksums of the data stored in the source and in the destination. You can check either the entire dataset or just the files or objects that DataSync transferred.
+
+Using Amazon CloudWatch Metrics, you can see the number of files and amount of data which has been copied. You can also enable logging of individual files to CloudWatch Logs, to identify what was transferred at a given time, as well as the results of the content integrity verification performed by DataSync
+
+es. Using VPC endpoints increases the security of your data by keeping network traffic within your Amazon Virtual Private Cloud (Amazon VPC). VPC endpoints for DataSync are powered by AWS PrivateLink, a highly available, scalable technology that enables you to privately connect your VPC to supported AWS services.
+
+===================================================================
+2. Migrate AWS EC2 instances to Azure using the Azure Migrate service. Azure Migrate is purpose-built for server migration. Azure Migrate provides a centralized hub for discovery, assessment and migration of on-premises machines to Azure.
+
+====================================
+
+3. setup new replicaset and update config properties with mongodb
+   -> We can access the configuration of a replica set using the rs.conf() method or the replSetGetConfig command.
+   
+   =====================================================================================================
+ 4.Assuming we have network connectivity between AWS to azure Data will be stored in Azure Cosmos DB
+ 
+ Restore the  database in SQL Server 
+Azure Cosmos DB emulator: The Azure Cosmos DB emulator provides a local environment that can be used for development purposes. It simulates cosmos DB services. Using the Azure Cosmos DB emulator, you can develop and test your application locally. You can download it from here
+Azure Cosmos database migration toolkit: Using this tool, we can import data from JSON files, SQL, CSV files, MongoDB, Amazon DynamoDB, etc. 
+
+
+============================
+
+5. Blue green deployment: Blue old deployment model 
+                          Green new deployment model
+						  
+						  blue green deployment to update app during peak use
+	We are able to do this because we took the microservices in production env and copied it to an identical green env
+	
+	Use a load balancer to redirect each user transaction from blue to green. Blue can either standup for disaster recovery options or can become container for future updates
+	
+	
+6. Rolling update using Kubernetes:-
+
+A Deployment controller provides declarative updates for Pods and ReplicaSets.
+
+You describe a desired state in a Deployment object, and the Deployment controller changes the actual state to the desired state at a controlled rate. You can define Deployments to create new ReplicaSets, or to remove existing Deployments and adopt all their resources with new Deployments.
+
+The important bit in the description above is “at a controlled rate”: that means that a group of Pods can be updated one by one, two by two, by removing them all at once and spinning up new ones, the choice is yours. The exact behavior is configured by a snippet similar to this one:
+
+   type: RollingUpdate   # <1>
+Can be either Recreate or RollingUpdate. In the first case, Kubernetes will terminate all the Pods, and then proceed to start the updated ones. This is great for a development environment, but doesn’t implement zero-downtime. Alternatively, the value RollingUpdate configures Kubernetes to use the maxSurge and maxUnavailable parameter values.
+Defines how many additional Pods can be started, compared to the number of replicas. Can be a set number, or a percentage.
+Defines how many Pods can be stopped from the current number of replicas. Can be a set number, or a percentage.
+Let’s illustrate the process with some examples.
+
+The following diagrams show the evolution of the number of Pods, in regard to the version, as time passes.
+
+The vertical axis displays the number of Pods
+Blue represent the number of v1.0 Pods
+Dark blue represent the number of v2.0 Pods
+The horizontal axis displays the time	
+
+=====================================
+
+7. Do config server refresh update
+For eg. in spring cloud config refresh config server at runtime
+Refreshing Configuration Properties with /refresh Endpoint
+Rewrite application.properties
+
+
+Calling this endpoint will cause:
+
+get the latest configuration from the config server and update its configuration annotated by @RefreshScope
+send a message to AMQP exchange informing about refresh event
+all subscribed nodes will update their configuration as well
